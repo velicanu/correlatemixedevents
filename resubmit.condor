@@ -1,0 +1,8 @@
+Universe   = vanilla
+Executable = correlate.sh
+Arguments  = 3 moremb.txt reclean.txt /mnt/hadoop/cms/store/user/velicanu/matchedfiles 40 0.2
+GetEnv     = True
+Log        = simple3.log
+Output     = simple3.out
+Error      = simple3.err
+Queue
