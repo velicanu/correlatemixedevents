@@ -8,9 +8,12 @@
 #include <stdlib.h>
 #include <unordered_set>
 #include <sstream> 
+#include "factorizedPtCorr.h"
 // #include <time.h> 
 
 // Example of forest skim
+
+sampleType sType = kHIDATA;
 
 int compare(const void * a, const void * b)
 {
@@ -144,6 +147,9 @@ bool rejectevent( HiForest * c, int centmin, int centmax, double vzrange, double
 
 void correlateEventNtuple(char *infname = "0.root", char *mbname = "mb.root", char *outfname = "matched_Jet.root",int parallelization=40,int iteration=0, double deltavz = 0.5)
 {
+  InitCorrFiles(sType);   // Yen-Jie: assuming that we are working on Heavy Ion Data!!!!!!!!
+  cout <<"Loading HEAVY ION DATA correction tables !!"<<endl;
+  InitCorrHists(sType);
   // srand (time(NULL));
   // ### Some jet cuts ###
   double leadingjetpthigh = 300;
@@ -165,7 +171,7 @@ void correlateEventNtuple(char *infname = "0.root", char *mbname = "mb.root", ch
   myfilename<<"mixevents_"<<iteration<<".csv";
   myfile.open (myfilename.str());
   // myfile << "Writing this to a file.\n";
-  
+  TFile * outfhists = new TFile("outfhists.root","recreate");
   cout<<"Loading minbias hiforest... ";
   // Define the input file and HiForest
   HiForest *d = new HiForest(mbname);
@@ -263,6 +269,7 @@ void correlateEventNtuple(char *infname = "0.root", char *mbname = "mb.root", ch
   }
   cout<<"done."<<endl;
   
+  TH1D * hmixtrketa = new TH1D("hmixtrketa",";trkEta;",100,-2.5,2.5);
   int nfilled = 0;
   cout<<"Iterating minbias events from "<<0<<" to "<<nmbentries<<" ... ";
   for (int j = 0; j < nmbentries; ++j)
@@ -275,8 +282,20 @@ void correlateEventNtuple(char *infname = "0.root", char *mbname = "mb.root", ch
       continue;
     }
     d->GetEntry(j);
+    InitPosArrPbPb(d->evt.hiBin);
+		for(int i = 0 ; i < d->track.nTrk ; ++i)
+    {
+      if(fabs(d->track.trkEta[i])<2.4&&d->track.highPurity[i]&&fabs(d->track.trkDz1[i]/d->track.trkDzError1[i])<3&&fabs(d->track.trkDxy1[i]/d->track.trkDxyError1[i])<3&&d->track.trkPtError[i]/d->track.trkPt[i]<0.1)
+      {
+        if(d->track.trkPt[i]>2 || d->track.trkPt[i]<1) continue;
+        float trkRMin = getTrkRMin(d->track.trkPhi[i], d->track.trkEta[i],d->myjet.nref,d->myjet.jtphi,d->myjet.jteta,d->myjet.jtpt);
+        float effweight = factorizedPtCorr(getPtBin(d->track.trkPt[i], sType), d->evt.hiBin, d->track.trkPt[i], d->track.trkPhi[i], d->track.trkEta[i], trkRMin, sType);
+         
+        hmixtrketa->Fill(d->track.trkEta[i],effweight);
+      }
+    }
     // cout<<d->evt.hiBin<<" "<<d->evt.vz<<endl;
-    d->FillOutput();
+    // d->FillOutput();
     nfilled++;
   }
   cout<<"done."<<endl;
@@ -290,6 +309,9 @@ void correlateEventNtuple(char *infname = "0.root", char *mbname = "mb.root", ch
 
   myfile.close();
   cout<<"Program completed succesfully."<<endl;
+  outfhists->cd();
+  hmixtrketa->Write();
+  outfhists->Close();
 }
 
 
